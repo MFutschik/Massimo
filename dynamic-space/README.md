@@ -16,20 +16,24 @@ Datei `schritt-XX-…/index.html` per Doppelklick im Browser öffnen. Kein Serve
 | Schritt | Inhalt | Stand |
 | --- | --- | --- |
 | 01 | Würfel, Licht, Drehen per Ziehen | fertig, im Testbrowser geprüft |
-| 02 | Würfel → Dose (Form aus Code), Falzdeckeldose 73/38 mm | fertig, im Testbrowser geprüft; Falz/Mulde geschätzt |
-| 03 | Metall-Material (Deckel gebürstet, Rand poliert) | fertig, im Testbrowser geprüft; Umgebung nur Platzhalter |
+| 02 | Dose-Form nach Vorlagenbild: Falzrand, Riefen im Deckel, Ringlasche | überarbeitet nach Vorlage, im Testbrowser geprüft; Details aus dem Bild geschätzt |
+| 03 | Metall-Material nach Vorlage (Deckel satiniert, Rand/Lasche poliert, Etikett schwarz mit feiner Längsmaserung) | überarbeitet nach Vorlage, im Testbrowser geprüft; Umgebung nur Platzhalter |
 | 04 | Fotostudio-Licht | offen |
 | 05 | Kamera per Scroll | offen |
 | 06 | Explosionsansicht (Deckel, Dose, Boden) | offen |
 
+## Arbeitsregel
+
+Das Vorlagenbild von Jan („YOUR BRAND"-Dose) ist die Referenz. Nichts hinzuerfinden, was
+dort nicht zu sehen ist. Was aus dem Bild geschätzt ist, steht im Code als „geschätzt".
+
 ## Offene Punkte
 
-- Dose, Maße: Durchmesser 73 mm und Höhe 38 mm gelten laut Jan für die **ganze Dose** (Falzdeckel ist genauso breit wie die Dose). Millimetergenau muss es für dieses Lernprojekt nicht sein. Schritt 02 ist damit maßlich so in Ordnung.
-- Geschätzt aus einem Vorlagenbild (für das Lernprojekt ausreichend, bei Bedarf ersetzen): Falzhöhe (4,5 mm), Falzüberstand (0,6 mm), Deckelmulde (2 mm tief), Rundungen.
-- Ringzuglasche (Aufreißlasche) fehlt noch. Gehört die zur echten Dose? Und: ist die Deckelfarbe gold? Das Vorlagenbild zeigt Gold, ob das Eurer Dose entspricht, ist offen.
+- Maße: 73 mm Durchmesser und 38 mm Höhe der ganzen Dose (von Jan bestätigt). Alles andere (Falzhöhe, Tiefe und Lage der Riefen, Laschengröße, Winkel) ist aus dem Bild geschätzt, für das Lernprojekt ausreichend.
+- Noch nicht nachgebaut, aber im Vorlagenbild zu sehen: die gepresste Mulde im Deckel rund um die Lasche, die Nietform im Detail, die Rundung des Lasche-Hebels, der Fuß-Falz am Boden im Detail (derzeit gespiegelter Deckel-Rand).
+- Schriftzug „YOUR BRAND" auf dem Etikett ist ein Platzhalter der Vorlage und wird nicht übernommen. Echter Text/Logo kommt von MOUTH.
+- Farben (Gold, Schwarz) stammen aus der Vorlage, nicht aus einem MOUTH-Farbwert.
+- Die Spiegelung in Schritt 03 kommt von einem einfachen Farbverlauf, das Metall wirkt dadurch noch dunkler als in der Vorlage. Echtes Studio-Licht folgt in Schritt 04.
 - Die Dose ist innen hohl und ohne Wandstärke (nur Oberflächen). Für die Explosionsansicht (Schritt 06) muss das ggf. nachgezogen werden.
-- Das Etikett ist in Schritt 03 matt schwarz (aus dem Vorlagenbild übernommen, nicht bestätigt). Echte Farbe/Oberfläche von MOUTH nötig.
-- Die Spiegelung in Schritt 03 kommt von einem einfachen Farbverlauf. Das echte Studio-Licht folgt in Schritt 04.
-- Soll die Dose eine bestimmte Aufschrift/Etikett bekommen? Wenn ja: Material von MOUTH, nichts ausgedacht.
 - Ob die Bewegung auf einem echten Handy flüssig läuft: nur auf dem Gerät prüfbar, nicht hier.
 - three.js liegt als Kopie in `lib/` (Version 0.170, MIT-Lizenz). Aktualisieren erst bei Bedarf.

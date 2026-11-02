@@ -13,42 +13,36 @@
 </head>
 <body>
 <canvas id="welt"></canvas>
-<p>Schritt 2 · Falzdeckeldose 73/38 mm · Ziehen dreht die Dose</p>
+<p>Schritt 2 · Falzdeckeldose 73/38 mm mit Ringlasche · Ziehen dreht die Dose</p>
 
 <script>window.exports = {};</script>
 <script src="../lib/three.cjs"></script>
 <script>
 const THREE = window.exports;
 
-/* ------------------------------------------------------------------
-   MASSE – alles in Millimetern. Wir bauen in echten Einheiten, damit die
-   Proportionen stimmen (Regel aus der Anleitung: „real size in millimetres").
+/* ==================================================================
+   REFERENZ: Die Dose richtet sich nach dem Vorlagenbild von Jan
+   („YOUR BRAND"-Dose). Daraus abgelesen: schmaler flacher Falzrand,
+   dahinter eine vertiefte Deckelfläche mit konzentrischen Riefen (Sicken),
+   eine Ringlasche links oben, mattschwarzes Etikett, goldener Boden-Falz.
+   Alle Maße außer 73 × 38 mm sind aus dem BILD geschätzt, nicht gemessen.
+   ================================================================== */
 
-   Von MOUTH angegeben:   Falzdeckeldose 073/038  → Durchmesser 73, Höhe 38
-   GESCHÄTZT (aus einem Vorlagenbild, NICHT bestätigt, bitte später ersetzen):
-   Falzhöhe, Falzüberstand, Deckelmulde, Rundungen.
-   ------------------------------------------------------------------ */
+/* MASSE in Millimetern.
+   Angegeben (Jan): 73 mm Durchmesser und 38 mm Höhe der ganzen Dose.
+   Alles andere: aus dem Bild geschätzt. */
 const MASS = {
-  durchmesser: 73,        // angegeben
-  hoehe: 38,              // angegeben
-  falzHoehe: 4.5,         // geschätzt: Höhe des umgebogenen Randes (Falz)
-  falzUeberstand: 0.6,    // geschätzt: der Falz steht etwas über den Körper
-  muldeTiefe: 2.0,        // geschätzt: Deckelmitte liegt so viel unter dem Rand
-  muldeRadiusAnteil: 0.80 // geschätzt: Mulde reicht bis 80 % des Radius
+  durchmesser: 73,
+  hoehe: 38,
+  falzHoehe: 3.5,        // geschätzt: Höhe des Falzrandes
+  falzUeberstand: 0.5    // geschätzt: Falz steht leicht über den Körper
 };
-const R = MASS.durchmesser / 2;          // Radius = halber Durchmesser
+const R = MASS.durchmesser / 2;
 const H = MASS.hoehe;
-const RF = R + MASS.falzUeberstand;      // Außenradius des Falzes
+const RF = R + MASS.falzUeberstand;
 
-/* ------------------------------------------------------------------
-   Deckel als „Drehkörper": Wir zeichnen NUR den Querschnitt (Radius, Höhe)
-   als Linie und lassen three.js sie einmal um die Mittelachse rotieren
-   (LatheGeometry = „Drechselbank"). Aus einer 2D-Linie wird so ein runder Körper.
-   Wichtig (Fehler Nr. 2 der Anleitung): Die Linie von innen nach außen und
-   dabei im Gegenuhrzeigersinn zeichnen, sonst rendert alles „von innen nach außen".
-   ------------------------------------------------------------------ */
+/* Viertelkreis für abgerundete Ecken. */
 function viertelkreis(mx, my, r, von, bis, schritte = 8) {
-  // Punkte auf einem Kreisbogen – für abgerundete Ecken
   const pts = [];
   for (let i = 0; i <= schritte; i++) {
     const w = von + (bis - von) * (i / schritte);
@@ -57,48 +51,118 @@ function viertelkreis(mx, my, r, von, bis, schritte = 8) {
   return pts;
 }
 
-function deckelProfil() {
-  const oben = H;                          // Oberkante des Falzes
-  const unten = H - MASS.falzHoehe;        // Unterkante des Falzes
-  const mulde = oben - MASS.muldeTiefe;    // Höhe der Deckelmitte
-  const rMulde = R * MASS.muldeRadiusAnteil;
-  const rr = 1.2;                          // Rundungsradius außen (geschätzt)
-  const p = [];
-  p.push(new THREE.Vector2(0, mulde));                   // Mitte des Deckels
-  p.push(new THREE.Vector2(rMulde, mulde));              // flache Mulde
-  p.push(new THREE.Vector2(rMulde + 1.5, oben - 0.4));   // schräge Wand nach oben
-  p.push(new THREE.Vector2(RF - rr, oben));              // Falzoberseite
-  p.push(...viertelkreis(RF - rr, oben - rr, rr, Math.PI / 2, 0)); // Ecke runden
-  p.push(new THREE.Vector2(RF, unten));                  // Falz-Außenwand nach unten
-  p.push(new THREE.Vector2(R, unten - 0.3));             // zurück auf Körper-Radius
-  return p.reverse();   // Laufrichtung drehen, damit die Außenseite sichtbar ist (siehe oben)
+/* ------------------------------------------------------------------
+   DECKEL als Drehkörper (LatheGeometry): wir zeichnen nur den Querschnitt
+   (Radius, Höhe) von der Mitte nach außen und lassen ihn rotieren.
+   Querschnitt nach Vorlage, von innen nach außen:
+     flache Mitte → kleine Riefe (Sicke) → breite Stufe → Schulter → Falzrand
+   Höhen sind relativ zur Falz-Oberkante (0 = ganz oben, negativ = tiefer).
+   ------------------------------------------------------------------ */
+function deckelProfile() {
+  const oben = H;
+  const unten = H - MASS.falzHoehe;
+  const rr = 1.0;                                   // Rundung außen
+  const P = (r, dy) => new THREE.Vector2(r, oben + dy);
+  const flaeche = [
+    P(0, -2.4),         // Mitte, flach
+    P(19.5, -2.4),
+    P(20.8, -1.9),      // kleine Riefe: Wulst …
+    P(22.3, -2.7),      // … und Rille
+    P(24.5, -2.6),      // breite, flache Stufe
+    P(28.0, -2.6),
+    P(29.4, -1.3),      // Schulter nach oben
+    P(33.0, -1.1),
+    P(34.2, -0.2),      // Übergang zum Falzrand
+    P(RF - rr, 0)       // flache Oberseite des Falzrandes
+  ];
+  const rand = [
+    ...viertelkreis(RF - rr, oben - rr, rr, Math.PI / 2, 0),
+    new THREE.Vector2(RF, unten),
+    new THREE.Vector2(R, unten - 0.3)
+  ];
+  // Laufrichtung drehen, damit die Außenseite sichtbar ist (Fehler Nr. 2 der Anleitung)
+  return { flaeche: flaeche.reverse(), rand: rand.reverse() };
 }
+const profile = deckelProfile();
+const flaecheGeo = new THREE.LatheGeometry(profile.flaeche, 360);
+const randGeo = new THREE.LatheGeometry(profile.rand, 360);
 
-const deckelGeo = new THREE.LatheGeometry(deckelProfil(), 128);
-const bodenGeo = deckelGeo.clone();     // Boden = gleiche Form, nur gespiegelt (unten)
-
-/* Körper: ein offenes Rohr zwischen Boden-Falz und Deckel-Falz. */
+/* Körper: offenes Rohr zwischen den beiden Falzrändern. */
 const koerperHoehe = H - 2 * (MASS.falzHoehe - 0.3);
-const koerperGeo = new THREE.CylinderGeometry(R, R, koerperHoehe, 128, 1, true);
+const koerperGeo = new THREE.CylinderGeometry(R, R, koerperHoehe, 180, 1, true);
 
-/* Materialien: vorerst einfach. Echte Metalloberflächen kommen in Schritt 3. */
-const metall = new THREE.MeshStandardMaterial({ color: 0xb08d57, metalness: 0.5, roughness: 0.4 });
-const etikett = new THREE.MeshStandardMaterial({ color: 0x151515, metalness: 0.1, roughness: 0.7 });
+/* ------------------------------------------------------------------
+   RINGLASCHE (Aufreißlasche). Sie ist KEIN Drehkörper, sondern eine flache
+   Form, die in die Dicke gezogen wird („Extrusion") – genau das Rezept aus
+   Schritt 3 der Anleitung: Umriss zeichnen, aufdicken, Kante leicht abrunden.
+   Lage nach Vorlage: links oben auf dem Deckel, Ring zur Mitte, Hebel zum Rand.
+   Maße (Länge ca. 27 mm, Ring ca. 17 × 12 mm) sind aus dem Bild geschätzt.
+   ------------------------------------------------------------------ */
+function laschenGeometrie() {
+  // Umriss des Hebels (langgezogenes Rechteck mit runden Enden), flach in x/y
+  const hebel = new THREE.Shape();
+  const hb = 2.6;                                   // halbe Breite
+  hebel.moveTo(1.5, -hb);
+  hebel.lineTo(14, -hb);
+  hebel.lineTo(14, hb);
+  hebel.lineTo(1.5, hb);
+  hebel.absarc(1.5, 0, hb, Math.PI / 2, Math.PI * 1.5, false);
 
-/* Teile zusammenbauen. Jedes Teil bleibt ein eigenes Objekt, damit wir es
-   später in der Explosionsansicht einzeln verschieben können. */
+  // Ring: Außenellipse mit ovalem Loch zum Greifen
+  const ring = new THREE.Shape();
+  ring.absellipse(19, 0, 8.4, 6.2, 0, Math.PI * 2, false, 0);
+  const loch = new THREE.Path();
+  loch.absellipse(19.4, 0, 5.2, 3.7, 0, Math.PI * 2, true, 0);
+  ring.holes.push(loch);
+
+  const opt = { depth: 0.9, bevelEnabled: true, bevelThickness: 0.35,
+                bevelSize: 0.35, bevelSegments: 3, curveSegments: 48 };
+  return [new THREE.ExtrudeGeometry(hebel, opt), new THREE.ExtrudeGeometry(ring, opt)];
+}
+const laschenTeile = laschenGeometrie();
+const nietGeo = new THREE.CylinderGeometry(1.7, 1.9, 1.0, 40);
+
+/* MATERIALIEN: in Schritt 2 nur einfache Farben, damit wir die FORM beurteilen.
+   Echte Metalloberflächen (gebürstet, poliert, spiegelnd) kommen in Schritt 3. */
+const satiniert = new THREE.MeshStandardMaterial({ color: 0xb08d57, metalness: 0.5, roughness: 0.4 });
+const poliert = satiniert;
+const etikett = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, metalness: 0.1, roughness: 0.7 });
+
+/* ---- Teile zusammenbauen ---- */
+function metallTeil() {
+  const teil = new THREE.Group();
+  teil.add(new THREE.Mesh(flaecheGeo, satiniert), new THREE.Mesh(randGeo, poliert));
+  return teil;
+}
 const dose = new THREE.Group();
-const deckel = new THREE.Mesh(deckelGeo, metall);
-const boden = new THREE.Mesh(bodenGeo, metall);
+const deckel = metallTeil();
+const boden = metallTeil();
 const koerper = new THREE.Mesh(koerperGeo, etikett);
 
-deckel.position.y = -H / 2;             // alles um die Mitte der Dose zentrieren
+/* Lasche: gehört zum Deckel. Sie liegt auf der flachen Deckelmitte
+   (Höhe H-2.4), der Ring ist leicht angehoben. Position/Winkel nach Vorlage. */
+const lasche = new THREE.Group();
+laschenTeile.forEach(g => lasche.add(new THREE.Mesh(g, poliert)));
+const niet = new THREE.Mesh(nietGeo, satiniert);
+niet.rotation.x = 0;                                 // steht senkrecht
+niet.position.set(2.2, 0, 0.9);
+// Extrusion geht in +z; wir legen die Lasche flach auf den Deckel (Drehung um x)
+const laschenWurzel = new THREE.Group();
+lasche.add(niet);
+niet.rotation.x = Math.PI / 2;
+lasche.rotation.x = -Math.PI / 2;                    // flach hinlegen
+laschenWurzel.add(lasche);
+laschenWurzel.position.set(-28, H - 2.4 + 0.4, -3.5);
+laschenWurzel.rotation.y = 0.2;                      // leicht schräg, wie im Bild
+laschenWurzel.rotation.z = 0.13;                     // Ring etwas angehoben, wie im Bild
+deckel.add(laschenWurzel);
+
+deckel.position.y = -H / 2;
 boden.position.y = H / 2;
-boden.scale.y = -1;                     // spiegeln: Boden zeigt nach unten
-koerper.position.y = 0;
+boden.scale.y = -1;
 dose.add(deckel, boden, koerper);
 
-/* ---- Bühne, Kamera, Licht (wie in Schritt 1) ---- */
+/* ---- Bühne, Kamera, Licht ---- */
 const leinwand = document.getElementById('welt');
 const renderer = new THREE.WebGLRenderer({ canvas: leinwand, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -108,17 +172,13 @@ szene.background = new THREE.Color(0x0a0a0a);
 szene.add(dose);
 
 const kamera = new THREE.PerspectiveCamera(30, 1, 1, 2000);
-
 const lampe = new THREE.DirectionalLight(0xffffff, 3);
 lampe.position.set(60, 120, 150);
 const lampe2 = new THREE.DirectionalLight(0xffeedd, 1.2);
 lampe2.position.set(-120, 30, -60);
 szene.add(lampe, lampe2, new THREE.AmbientLight(0xffffff, 0.45));
 
-/* Kamera nach GRÖSSE statt nach Abstand (Regel aus Schritt 6 der Anleitung):
-   „Zeige 110 mm auf dem Bildschirm." Dasselbe passt dann auf Handy und Monitor.
-   Wir rechnen den Abstand aus, damit 110 mm sowohl in die Breite als auch in
-   die Höhe des Fensters passen. */
+/* Kamera nach GRÖSSE statt nach Abstand: „Zeige 110 mm auf dem Bildschirm." */
 const ZEIGE_MM = 110;
 function anpassen() {
   const b = window.innerWidth, h = window.innerHeight;
@@ -133,8 +193,9 @@ function anpassen() {
 window.addEventListener('resize', anpassen);
 anpassen();
 
-/* ---- Drehen per Ziehen, weich nachlaufend (wie in Schritt 1) ---- */
-let zielX = 0.55, zielY = -0.5;
+/* Drehen per Ziehen, weich nachlaufend. Startblick ähnlich dem Vorlagenbild
+   (flacher Blick von schräg vorn auf den Deckel). */
+let zielX = 0.3, zielY = 0;
 let ziehen = false, letzteX = 0, letzteY = 0;
 dose.rotation.set(zielX, zielY, 0);
 
