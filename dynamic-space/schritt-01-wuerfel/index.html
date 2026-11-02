@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dynamic Space – Schritt 1: Würfel</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0a; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  p { position: fixed; left: 16px; bottom: 16px; margin: 0; color: #8a8270;
+      font: 13px/1.4 ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<canvas id="welt"></canvas>
+<p>Schritt 1 · Ziehen mit Maus oder Finger dreht den Würfel</p>
+
+<!-- three.js laden (liegt lokal im Ordner lib/, kein Internet nötig).
+     Die zwei Zeilen davor sind nur ein Kniff, damit die Datei per Doppelklick
+     läuft, ohne Server. -->
+<script>window.exports = {};</script>
+<script src="../lib/three.cjs"></script>
+<script>
+const THREE = window.exports;
+
+/* ------------------------------------------------------------------
+   Die vier Grundzutaten jeder 3D-Szene:
+   1. Szene    – die „Bühne", auf der alles steht
+   2. Kamera   – von wo wir schauen
+   3. Renderer – das Ding, das die Szene in Pixel auf den Bildschirm malt
+   4. Objekt   – hier: ein Würfel (Form + Oberfläche = „Mesh")
+   ------------------------------------------------------------------ */
+
+const leinwand = document.getElementById('welt');
+
+// Renderer: antialias glättet Kanten. Pixelrate auf 2 begrenzt, spart Akku am Handy.
+const renderer = new THREE.WebGLRenderer({ canvas: leinwand, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+const szene = new THREE.Scene();
+szene.background = new THREE.Color(0x0a0a0a);
+
+// Kamera: 40° Blickwinkel, Abstand 6 Einheiten vom Mittelpunkt.
+const kamera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+kamera.position.set(0, 0, 6);
+
+// Objekt: Würfel mit Kantenlänge 2 Einheiten.
+// „Standard-Material" reagiert auf Licht (ein einfaches würde flach aussehen).
+const wuerfel = new THREE.Mesh(
+  new THREE.BoxGeometry(2, 2, 2),
+  new THREE.MeshStandardMaterial({ color: 0xc8b88a, roughness: 0.5, metalness: 0.2 })
+);
+szene.add(wuerfel);
+
+// Licht: ein gerichtetes Licht (wie eine Lampe) plus schwaches Grundlicht,
+// damit die Schattenseiten nicht komplett schwarz sind.
+const lampe = new THREE.DirectionalLight(0xffffff, 3);
+lampe.position.set(3, 4, 5);
+szene.add(lampe, new THREE.AmbientLight(0xffffff, 0.35));
+
+// Größe an das Fenster anpassen (auch beim Drehen des Handys).
+function anpassen() {
+  const b = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(b, h, false);
+  kamera.aspect = b / h;
+  kamera.updateProjectionMatrix();
+}
+window.addEventListener('resize', anpassen);
+anpassen();
+
+/* Drehen per Ziehen: Wir merken uns ein „Ziel" für die Drehung. Der Würfel
+   läuft jedes Bild ein Stück darauf zu. Das nennt man „Easing" – es macht
+   die Bewegung weich statt ruckelig. Dieselbe Idee steckt später in der
+   Kamerasteuerung per Scroll. */
+let zielX = 0.4, zielY = 0.6;
+let ziehen = false, letzteX = 0, letzteY = 0;
+
+leinwand.addEventListener('pointerdown', e => {
+  ziehen = true; letzteX = e.clientX; letzteY = e.clientY;
+  leinwand.setPointerCapture(e.pointerId);
+});
+leinwand.addEventListener('pointerup', () => ziehen = false);
+leinwand.addEventListener('pointermove', e => {
+  if (!ziehen) return;
+  zielY += (e.clientX - letzteX) * 0.01;
+  zielX += (e.clientY - letzteY) * 0.01;
+  letzteX = e.clientX; letzteY = e.clientY;
+});
+
+// Die Schleife: läuft bei jedem Bild (meist 60-mal pro Sekunde).
+function schleife() {
+  wuerfel.rotation.x += (zielX - wuerfel.rotation.x) * 0.1;
+  wuerfel.rotation.y += (zielY - wuerfel.rotation.y) * 0.1;
+  renderer.render(szene, kamera);
+  requestAnimationFrame(schleife);
+}
+schleife();
+</script>
+</body>
+</html>
