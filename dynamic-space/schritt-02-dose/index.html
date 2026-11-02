@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dynamic Space – Schritt 2: Dose</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0a; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  p { position: fixed; left: 16px; bottom: 16px; margin: 0; color: #8a8270;
+      font: 13px/1.4 ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<canvas id="welt"></canvas>
+<p>Schritt 2 · Falzdeckeldose 73/38 mm · Ziehen dreht die Dose</p>
+
+<script>window.exports = {};</script>
+<script src="../lib/three.cjs"></script>
+<script>
+const THREE = window.exports;
+
+/* ------------------------------------------------------------------
+   MASSE – alles in Millimetern. Wir bauen in echten Einheiten, damit die
+   Proportionen stimmen (Regel aus der Anleitung: „real size in millimetres").
+
+   Von MOUTH angegeben:   Falzdeckeldose 073/038  → Durchmesser 73, Höhe 38
+   GESCHÄTZT (aus einem Vorlagenbild, NICHT bestätigt, bitte später ersetzen):
+   Falzhöhe, Falzüberstand, Deckelmulde, Rundungen.
+   ------------------------------------------------------------------ */
+const MASS = {
+  durchmesser: 73,        // angegeben
+  hoehe: 38,              // angegeben
+  falzHoehe: 4.5,         // geschätzt: Höhe des umgebogenen Randes (Falz)
+  falzUeberstand: 0.6,    // geschätzt: der Falz steht etwas über den Körper
+  muldeTiefe: 2.0,        // geschätzt: Deckelmitte liegt so viel unter dem Rand
+  muldeRadiusAnteil: 0.80 // geschätzt: Mulde reicht bis 80 % des Radius
+};
+const R = MASS.durchmesser / 2;          // Radius = halber Durchmesser
+const H = MASS.hoehe;
+const RF = R + MASS.falzUeberstand;      // Außenradius des Falzes
+
+/* ------------------------------------------------------------------
+   Deckel als „Drehkörper": Wir zeichnen NUR den Querschnitt (Radius, Höhe)
+   als Linie und lassen three.js sie einmal um die Mittelachse rotieren
+   (LatheGeometry = „Drechselbank"). Aus einer 2D-Linie wird so ein runder Körper.
+   Wichtig (Fehler Nr. 2 der Anleitung): Die Linie von innen nach außen und
+   dabei im Gegenuhrzeigersinn zeichnen, sonst rendert alles „von innen nach außen".
+   ------------------------------------------------------------------ */
+function viertelkreis(mx, my, r, von, bis, schritte = 8) {
+  // Punkte auf einem Kreisbogen – für abgerundete Ecken
+  const pts = [];
+  for (let i = 0; i <= schritte; i++) {
+    const w = von + (bis - von) * (i / schritte);
+    pts.push(new THREE.Vector2(mx + Math.cos(w) * r, my + Math.sin(w) * r));
+  }
+  return pts;
+}
+
+function deckelProfil() {
+  const oben = H;                          // Oberkante des Falzes
+  const unten = H - MASS.falzHoehe;        // Unterkante des Falzes
+  const mulde = oben - MASS.muldeTiefe;    // Höhe der Deckelmitte
+  const rMulde = R * MASS.muldeRadiusAnteil;
+  const rr = 1.2;                          // Rundungsradius außen (geschätzt)
+  const p = [];
+  p.push(new THREE.Vector2(0, mulde));                   // Mitte des Deckels
+  p.push(new THREE.Vector2(rMulde, mulde));              // flache Mulde
+  p.push(new THREE.Vector2(rMulde + 1.5, oben - 0.4));   // schräge Wand nach oben
+  p.push(new THREE.Vector2(RF - rr, oben));              // Falzoberseite
+  p.push(...viertelkreis(RF - rr, oben - rr, rr, Math.PI / 2, 0)); // Ecke runden
+  p.push(new THREE.Vector2(RF, unten));                  // Falz-Außenwand nach unten
+  p.push(new THREE.Vector2(R, unten - 0.3));             // zurück auf Körper-Radius
+  return p.reverse();   // Laufrichtung drehen, damit die Außenseite sichtbar ist (siehe oben)
+}
+
+const deckelGeo = new THREE.LatheGeometry(deckelProfil(), 128);
+const bodenGeo = deckelGeo.clone();     // Boden = gleiche Form, nur gespiegelt (unten)
+
+/* Körper: ein offenes Rohr zwischen Boden-Falz und Deckel-Falz. */
+const koerperHoehe = H - 2 * (MASS.falzHoehe - 0.3);
+const koerperGeo = new THREE.CylinderGeometry(R, R, koerperHoehe, 128, 1, true);
+
+/* Materialien: vorerst einfach. Echte Metalloberflächen kommen in Schritt 3. */
+const metall = new THREE.MeshStandardMaterial({ color: 0xb08d57, metalness: 0.5, roughness: 0.4 });
+const etikett = new THREE.MeshStandardMaterial({ color: 0x151515, metalness: 0.1, roughness: 0.7 });
+
+/* Teile zusammenbauen. Jedes Teil bleibt ein eigenes Objekt, damit wir es
+   später in der Explosionsansicht einzeln verschieben können. */
+const dose = new THREE.Group();
+const deckel = new THREE.Mesh(deckelGeo, metall);
+const boden = new THREE.Mesh(bodenGeo, metall);
+const koerper = new THREE.Mesh(koerperGeo, etikett);
+
+deckel.position.y = -H / 2;             // alles um die Mitte der Dose zentrieren
+boden.position.y = H / 2;
+boden.scale.y = -1;                     // spiegeln: Boden zeigt nach unten
+koerper.position.y = 0;
+dose.add(deckel, boden, koerper);
+
+/* ---- Bühne, Kamera, Licht (wie in Schritt 1) ---- */
+const leinwand = document.getElementById('welt');
+const renderer = new THREE.WebGLRenderer({ canvas: leinwand, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+const szene = new THREE.Scene();
+szene.background = new THREE.Color(0x0a0a0a);
+szene.add(dose);
+
+const kamera = new THREE.PerspectiveCamera(30, 1, 1, 2000);
+
+const lampe = new THREE.DirectionalLight(0xffffff, 3);
+lampe.position.set(60, 120, 150);
+const lampe2 = new THREE.DirectionalLight(0xffeedd, 1.2);
+lampe2.position.set(-120, 30, -60);
+szene.add(lampe, lampe2, new THREE.AmbientLight(0xffffff, 0.45));
+
+/* Kamera nach GRÖSSE statt nach Abstand (Regel aus Schritt 6 der Anleitung):
+   „Zeige 110 mm auf dem Bildschirm." Dasselbe passt dann auf Handy und Monitor.
+   Wir rechnen den Abstand aus, damit 110 mm sowohl in die Breite als auch in
+   die Höhe des Fensters passen. */
+const ZEIGE_MM = 110;
+function anpassen() {
+  const b = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(b, h, false);
+  kamera.aspect = b / h;
+  const halbeHoehe = Math.tan(THREE.MathUtils.degToRad(kamera.fov / 2));
+  const abstandHoehe = (ZEIGE_MM / 2) / halbeHoehe;
+  const abstandBreite = (ZEIGE_MM / 2) / (halbeHoehe * kamera.aspect);
+  kamera.position.set(0, 0, Math.max(abstandHoehe, abstandBreite));
+  kamera.updateProjectionMatrix();
+}
+window.addEventListener('resize', anpassen);
+anpassen();
+
+/* ---- Drehen per Ziehen, weich nachlaufend (wie in Schritt 1) ---- */
+let zielX = 0.55, zielY = -0.5;
+let ziehen = false, letzteX = 0, letzteY = 0;
+dose.rotation.set(zielX, zielY, 0);
+
+leinwand.addEventListener('pointerdown', e => {
+  ziehen = true; letzteX = e.clientX; letzteY = e.clientY;
+  leinwand.setPointerCapture(e.pointerId);
+});
+leinwand.addEventListener('pointerup', () => ziehen = false);
+leinwand.addEventListener('pointermove', e => {
+  if (!ziehen) return;
+  zielY += (e.clientX - letzteX) * 0.01;
+  zielX += (e.clientY - letzteY) * 0.01;
+  letzteX = e.clientX; letzteY = e.clientY;
+});
+
+function schleife() {
+  dose.rotation.x += (zielX - dose.rotation.x) * 0.1;
+  dose.rotation.y += (zielY - dose.rotation.y) * 0.1;
+  renderer.render(szene, kamera);
+  requestAnimationFrame(schleife);
+}
+schleife();
+</script>
+</body>
+</html>
