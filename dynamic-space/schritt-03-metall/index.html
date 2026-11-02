@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dynamic Space – Schritt 3: Metall</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0a; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  p { position: fixed; left: 16px; bottom: 16px; margin: 0; color: #8a8270;
+      font: 13px/1.4 ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<canvas id="welt"></canvas>
+<p>Schritt 3 · Metall: Deckel satiniert, Rand poliert · Ziehen dreht die Dose</p>
+
+<script>window.exports = {};</script>
+<script src="../lib/three.cjs"></script>
+<script>
+const THREE = window.exports;
+
+/* ------------------------------------------------------------------
+   MASSE – alles in Millimetern. Wir bauen in echten Einheiten, damit die
+   Proportionen stimmen (Regel aus der Anleitung: „real size in millimetres").
+
+   Von MOUTH angegeben:   Falzdeckeldose 073/038  → Durchmesser 73, Höhe 38
+   GESCHÄTZT (aus einem Vorlagenbild, NICHT bestätigt, bitte später ersetzen):
+   Falzhöhe, Falzüberstand, Deckelmulde, Rundungen.
+   ------------------------------------------------------------------ */
+const MASS = {
+  durchmesser: 73,        // angegeben
+  hoehe: 38,              // angegeben
+  falzHoehe: 4.5,         // geschätzt: Höhe des umgebogenen Randes (Falz)
+  falzUeberstand: 0.6,    // geschätzt: der Falz steht etwas über den Körper
+  muldeTiefe: 2.0,        // geschätzt: Deckelmitte liegt so viel unter dem Rand
+  muldeRadiusAnteil: 0.80 // geschätzt: Mulde reicht bis 80 % des Radius
+};
+const R = MASS.durchmesser / 2;          // Radius = halber Durchmesser
+const H = MASS.hoehe;
+const RF = R + MASS.falzUeberstand;      // Außenradius des Falzes
+
+/* ------------------------------------------------------------------
+   Deckel als „Drehkörper": Wir zeichnen NUR den Querschnitt (Radius, Höhe)
+   als Linie und lassen three.js sie einmal um die Mittelachse rotieren
+   (LatheGeometry = „Drechselbank"). Aus einer 2D-Linie wird so ein runder Körper.
+   Wichtig (Fehler Nr. 2 der Anleitung): Die Linie von innen nach außen und
+   dabei im Gegenuhrzeigersinn zeichnen, sonst rendert alles „von innen nach außen".
+   ------------------------------------------------------------------ */
+function viertelkreis(mx, my, r, von, bis, schritte = 8) {
+  // Punkte auf einem Kreisbogen – für abgerundete Ecken
+  const pts = [];
+  for (let i = 0; i <= schritte; i++) {
+    const w = von + (bis - von) * (i / schritte);
+    pts.push(new THREE.Vector2(mx + Math.cos(w) * r, my + Math.sin(w) * r));
+  }
+  return pts;
+}
+
+/* Schritt 3: Jedes Metallteil bekommt ZWEI Oberflächen (Regel der Anleitung):
+   die flache Fläche (satiniert, gebürstet) und die Kante (poliert, spiegelnd).
+   Dieser Kontrast wirkt hochwertig. Darum teilen wir die Deckel-Linie in zwei
+   Stücke und drehen jedes einzeln. Am Übergangspunkt treffen sie sich. */
+function deckelProfile() {
+  const oben = H;
+  const unten = H - MASS.falzHoehe;
+  const mulde = oben - MASS.muldeTiefe;
+  const rMulde = R * MASS.muldeRadiusAnteil;
+  const rr = 1.2;
+  const flaeche = [
+    new THREE.Vector2(0, mulde),
+    new THREE.Vector2(rMulde, mulde),
+    new THREE.Vector2(rMulde + 1.5, oben - 0.4),
+    new THREE.Vector2(RF - rr, oben)
+  ];
+  const rand = [
+    ...viertelkreis(RF - rr, oben - rr, rr, Math.PI / 2, 0),
+    new THREE.Vector2(RF, unten),
+    new THREE.Vector2(R, unten - 0.3)
+  ];
+  // Laufrichtung drehen, damit die Außenseite sichtbar ist (siehe Schritt 2)
+  return { flaeche: flaeche.reverse(), rand: rand.reverse() };
+}
+
+const profile = deckelProfile();
+const flaecheGeo = new THREE.LatheGeometry(profile.flaeche, 360);
+const randGeo = new THREE.LatheGeometry(profile.rand, 360);
+
+/* Körper: ein offenes Rohr zwischen Boden-Falz und Deckel-Falz. */
+const koerperHoehe = H - 2 * (MASS.falzHoehe - 0.3);
+const koerperGeo = new THREE.CylinderGeometry(R, R, koerperHoehe, 128, 1, true);
+
+/* ------------------------------------------------------------------
+   MATERIALIEN. Bei Metall gilt: „metalness 1" heißt, die Farbe ist nur noch die
+   Tönung der Spiegelung. Ob es poliert oder satiniert wirkt, entscheidet die
+   „roughness" (Rauheit): klein = Spiegel, größer = verwischte Spiegelung.
+   ------------------------------------------------------------------ */
+
+/* Gebürstete Struktur, im Code erzeugt (keine Bilddatei!): Ein Bild, in dem jede
+   Zeile einen etwas anderen Grauwert hat. Beim Drehkörper läuft die Bildhöhe
+   von der Mitte nach außen, also entstehen feine konzentrische Ringe – wie
+   gedrehtes/gebürstetes Blech. Dunkel = glatter, hell = rauer. */
+function buerstenTextur() {
+  const c = document.createElement('canvas');
+  c.width = 4; c.height = 1024;
+  const g = c.getContext('2d');
+  for (let y = 0; y < c.height; y++) {
+    const w = 150 + Math.random() * 105;          // 150..255
+    g.fillStyle = `rgb(${w},${w},${w})`;
+    g.fillRect(0, y, c.width, 1);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+/* Satiniert: matt-seidig, die Highlights ziehen sich entlang der Rillen
+   (Anisotropie = richtungsabhängige Spiegelung, wie bei gebürstetem Metall). */
+const satiniert = new THREE.MeshPhysicalMaterial({
+  color: 0xc9a46a, metalness: 1, roughness: 0.34,
+  roughnessMap: buerstenTextur(),
+  anisotropy: 0.8
+});
+/* Poliert: kleine Rauheit = fast Spiegel. Nur an den Rändern. */
+const poliert = new THREE.MeshPhysicalMaterial({
+  color: 0xd8b87c, metalness: 1, roughness: 0.12
+});
+/* Etikett: kein Metall, matt. */
+const etikett = new THREE.MeshPhysicalMaterial({ color: 0x151515, metalness: 0, roughness: 0.65 });
+
+/* Teile zusammenbauen. Deckel und Boden bestehen jetzt je aus zwei Meshes
+   (Fläche + Rand), die wir in einer Gruppe zusammenhalten. */
+function metallTeil() {
+  const teil = new THREE.Group();
+  teil.add(new THREE.Mesh(flaecheGeo, satiniert), new THREE.Mesh(randGeo, poliert));
+  return teil;
+}
+const dose = new THREE.Group();
+const deckel = metallTeil();
+const boden = metallTeil();
+const koerper = new THREE.Mesh(koerperGeo, etikett);
+
+deckel.position.y = -H / 2;
+boden.position.y = H / 2;
+boden.scale.y = -1;
+dose.add(deckel, boden, koerper);
+
+/* ---- Bühne, Kamera, Licht (wie in Schritt 1) ---- */
+const leinwand = document.getElementById('welt');
+const renderer = new THREE.WebGLRenderer({ canvas: leinwand, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+const szene = new THREE.Scene();
+szene.background = new THREE.Color(0x0a0a0a);
+szene.add(dose);
+
+/* UMGEBUNG: Metall ist nur so gut wie das, was es spiegelt. Ohne Umgebung wäre
+   es fast schwarz. Hier nur ein einfacher Platzhalter: ein Farbverlauf (oben
+   hell, unten dunkel) als „Himmel", den three.js zu einer Spiegel-Vorlage
+   verarbeitet (PMREM). Das echte Fotostudio mit Softbox und Lichtstreifen
+   bauen wir in Schritt 4. */
+(function umgebungBauen() {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  const v = g.createLinearGradient(0, 0, 0, c.height);
+  v.addColorStop(0, '#d9d4c8');
+  v.addColorStop(0.45, '#555049');
+  v.addColorStop(1, '#0c0c0c');
+  g.fillStyle = v; g.fillRect(0, 0, c.width, c.height);
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  szene.environment = pmrem.fromEquirectangular(tex).texture;
+  tex.dispose(); pmrem.dispose();
+})();
+
+const kamera = new THREE.PerspectiveCamera(30, 1, 1, 2000);
+
+const lampe = new THREE.DirectionalLight(0xffffff, 1.5);
+lampe.position.set(60, 120, 150);
+const lampe2 = new THREE.DirectionalLight(0xffeedd, 0.6);
+lampe2.position.set(-120, 30, -60);
+szene.add(lampe, lampe2, new THREE.AmbientLight(0xffffff, 0.15));
+
+/* Kamera nach GRÖSSE statt nach Abstand (Regel aus Schritt 6 der Anleitung):
+   „Zeige 110 mm auf dem Bildschirm." Dasselbe passt dann auf Handy und Monitor.
+   Wir rechnen den Abstand aus, damit 110 mm sowohl in die Breite als auch in
+   die Höhe des Fensters passen. */
+const ZEIGE_MM = 110;
+function anpassen() {
+  const b = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(b, h, false);
+  kamera.aspect = b / h;
+  const halbeHoehe = Math.tan(THREE.MathUtils.degToRad(kamera.fov / 2));
+  const abstandHoehe = (ZEIGE_MM / 2) / halbeHoehe;
+  const abstandBreite = (ZEIGE_MM / 2) / (halbeHoehe * kamera.aspect);
+  kamera.position.set(0, 0, Math.max(abstandHoehe, abstandBreite));
+  kamera.updateProjectionMatrix();
+}
+window.addEventListener('resize', anpassen);
+anpassen();
+
+/* ---- Drehen per Ziehen, weich nachlaufend (wie in Schritt 1) ---- */
+let zielX = 0.55, zielY = -0.5;
+let ziehen = false, letzteX = 0, letzteY = 0;
+dose.rotation.set(zielX, zielY, 0);
+
+leinwand.addEventListener('pointerdown', e => {
+  ziehen = true; letzteX = e.clientX; letzteY = e.clientY;
+  leinwand.setPointerCapture(e.pointerId);
+});
+leinwand.addEventListener('pointerup', () => ziehen = false);
+leinwand.addEventListener('pointermove', e => {
+  if (!ziehen) return;
+  zielY += (e.clientX - letzteX) * 0.01;
+  zielX += (e.clientY - letzteY) * 0.01;
+  letzteX = e.clientX; letzteY = e.clientY;
+});
+
+function schleife() {
+  dose.rotation.x += (zielX - dose.rotation.x) * 0.1;
+  dose.rotation.y += (zielY - dose.rotation.y) * 0.1;
+  renderer.render(szene, kamera);
+  requestAnimationFrame(schleife);
+}
+schleife();
+</script>
+</body>
+</html>

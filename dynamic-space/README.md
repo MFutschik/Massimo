@@ -17,7 +17,7 @@ Datei `schritt-XX-…/index.html` per Doppelklick im Browser öffnen. Kein Serve
 | --- | --- | --- |
 | 01 | Würfel, Licht, Drehen per Ziehen | fertig, im Testbrowser geprüft |
 | 02 | Würfel → Dose (Form aus Code), Falzdeckeldose 73/38 mm | fertig, im Testbrowser geprüft; Falz/Mulde geschätzt |
-| 03 | Metall-Material (gebürstet / poliert) | offen |
+| 03 | Metall-Material (Deckel gebürstet, Rand poliert) | fertig, im Testbrowser geprüft; Umgebung nur Platzhalter |
 | 04 | Fotostudio-Licht | offen |
 | 05 | Kamera per Scroll | offen |
 | 06 | Explosionsansicht (Deckel, Dose, Boden) | offen |
@@ -28,6 +28,8 @@ Datei `schritt-XX-…/index.html` per Doppelklick im Browser öffnen. Kein Serve
 - Geschätzt aus einem Vorlagenbild (für das Lernprojekt ausreichend, bei Bedarf ersetzen): Falzhöhe (4,5 mm), Falzüberstand (0,6 mm), Deckelmulde (2 mm tief), Rundungen.
 - Ringzuglasche (Aufreißlasche) fehlt noch. Gehört die zur echten Dose? Und: ist die Deckelfarbe gold? Das Vorlagenbild zeigt Gold, ob das Eurer Dose entspricht, ist offen.
 - Die Dose ist innen hohl und ohne Wandstärke (nur Oberflächen). Für die Explosionsansicht (Schritt 06) muss das ggf. nachgezogen werden.
+- Das Etikett ist in Schritt 03 matt schwarz (aus dem Vorlagenbild übernommen, nicht bestätigt). Echte Farbe/Oberfläche von MOUTH nötig.
+- Die Spiegelung in Schritt 03 kommt von einem einfachen Farbverlauf. Das echte Studio-Licht folgt in Schritt 04.
 - Soll die Dose eine bestimmte Aufschrift/Etikett bekommen? Wenn ja: Material von MOUTH, nichts ausgedacht.
 - Ob die Bewegung auf einem echten Handy flüssig läuft: nur auf dem Gerät prüfbar, nicht hier.
 - three.js liegt als Kopie in `lib/` (Version 0.170, MIT-Lizenz). Aktualisieren erst bei Bedarf.
