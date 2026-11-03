@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dynamic Space – Schritt 4: Studio-Licht</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0a; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  p { position: fixed; left: 16px; bottom: 16px; margin: 0; color: #8a8270;
+      font: 13px/1.4 ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<canvas id="welt"></canvas>
+<p>Schritt 4 · Studio-Licht · Ziehen dreht die Dose, Mausbewegung dreht das Studio</p>
+
+<script>window.exports = {};</script>
+<script src="../lib/three.cjs"></script>
+<script>
+const THREE = window.exports;
+
+/* ==================================================================
+   REFERENZ: Die Dose richtet sich nach dem Vorlagenbild von Jan
+   („YOUR BRAND"-Dose). Daraus abgelesen: schmaler flacher Falzrand,
+   dahinter eine vertiefte Deckelfläche mit konzentrischen Riefen (Sicken),
+   eine Ringlasche links oben, mattschwarzes Etikett, goldener Boden-Falz.
+   Alle Maße außer 73 × 38 mm sind aus dem BILD geschätzt, nicht gemessen.
+   ================================================================== */
+
+/* MASSE in Millimetern.
+   Angegeben (Jan): 73 mm Durchmesser und 38 mm Höhe der ganzen Dose.
+   Alles andere: aus dem Bild geschätzt. */
+const MASS = {
+  durchmesser: 73,
+  hoehe: 38,
+  falzHoehe: 3.5,        // geschätzt: Höhe des Falzrandes
+  falzUeberstand: 0.5    // geschätzt: Falz steht leicht über den Körper
+};
+const R = MASS.durchmesser / 2;
+const H = MASS.hoehe;
+const RF = R + MASS.falzUeberstand;
+
+/* Viertelkreis für abgerundete Ecken. */
+function viertelkreis(mx, my, r, von, bis, schritte = 8) {
+  const pts = [];
+  for (let i = 0; i <= schritte; i++) {
+    const w = von + (bis - von) * (i / schritte);
+    pts.push(new THREE.Vector2(mx + Math.cos(w) * r, my + Math.sin(w) * r));
+  }
+  return pts;
+}
+
+/* ------------------------------------------------------------------
+   DECKEL als Drehkörper (LatheGeometry): wir zeichnen nur den Querschnitt
+   (Radius, Höhe) von der Mitte nach außen und lassen ihn rotieren.
+   Querschnitt nach Vorlage, von innen nach außen:
+     flache Mitte → kleine Riefe (Sicke) → breite Stufe → Schulter → Falzrand
+   Höhen sind relativ zur Falz-Oberkante (0 = ganz oben, negativ = tiefer).
+   ------------------------------------------------------------------ */
+function deckelProfile() {
+  const oben = H;
+  const unten = H - MASS.falzHoehe;
+  const rr = 1.0;                                   // Rundung außen
+  const P = (r, dy) => new THREE.Vector2(r, oben + dy);
+  const flaeche = [
+    P(0, -2.4),         // Mitte, flach
+    P(19.5, -2.4),
+    P(20.8, -1.9),      // kleine Riefe: Wulst …
+    P(22.3, -2.7),      // … und Rille
+    P(24.5, -2.6),      // breite, flache Stufe
+    P(28.0, -2.6),
+    P(29.4, -1.3),      // Schulter nach oben
+    P(33.0, -1.1),
+    P(34.2, -0.2),      // Übergang zum Falzrand
+    P(RF - rr, 0)       // flache Oberseite des Falzrandes
+  ];
+  const rand = [
+    ...viertelkreis(RF - rr, oben - rr, rr, Math.PI / 2, 0),
+    new THREE.Vector2(RF, unten),
+    new THREE.Vector2(R, unten - 0.3)
+  ];
+  // Laufrichtung drehen, damit die Außenseite sichtbar ist (Fehler Nr. 2 der Anleitung)
+  return { flaeche: flaeche.reverse(), rand: rand.reverse() };
+}
+const profile = deckelProfile();
+const flaecheGeo = new THREE.LatheGeometry(profile.flaeche, 360);
+const randGeo = new THREE.LatheGeometry(profile.rand, 360);
+
+/* Körper: offenes Rohr zwischen den beiden Falzrändern. */
+const koerperHoehe = H - 2 * (MASS.falzHoehe - 0.3);
+const koerperGeo = new THREE.CylinderGeometry(R, R, koerperHoehe, 180, 1, true);
+
+/* ------------------------------------------------------------------
+   RINGLASCHE (Aufreißlasche). Sie ist KEIN Drehkörper, sondern eine flache
+   Form, die in die Dicke gezogen wird („Extrusion") – genau das Rezept aus
+   Schritt 3 der Anleitung: Umriss zeichnen, aufdicken, Kante leicht abrunden.
+   Lage nach Vorlage: links oben auf dem Deckel, Ring zur Mitte, Hebel zum Rand.
+   Maße (Länge ca. 27 mm, Ring ca. 17 × 12 mm) sind aus dem Bild geschätzt.
+   ------------------------------------------------------------------ */
+function laschenGeometrie() {
+  // Umriss des Hebels (langgezogenes Rechteck mit runden Enden), flach in x/y
+  const hebel = new THREE.Shape();
+  const hb = 2.6;                                   // halbe Breite
+  hebel.moveTo(1.5, -hb);
+  hebel.lineTo(14, -hb);
+  hebel.lineTo(14, hb);
+  hebel.lineTo(1.5, hb);
+  hebel.absarc(1.5, 0, hb, Math.PI / 2, Math.PI * 1.5, false);
+
+  // Ring: Außenellipse mit ovalem Loch zum Greifen
+  const ring = new THREE.Shape();
+  ring.absellipse(19, 0, 8.4, 6.2, 0, Math.PI * 2, false, 0);
+  const loch = new THREE.Path();
+  loch.absellipse(19.4, 0, 5.2, 3.7, 0, Math.PI * 2, true, 0);
+  ring.holes.push(loch);
+
+  const opt = { depth: 0.9, bevelEnabled: true, bevelThickness: 0.35,
+                bevelSize: 0.35, bevelSegments: 3, curveSegments: 48 };
+  return [new THREE.ExtrudeGeometry(hebel, opt), new THREE.ExtrudeGeometry(ring, opt)];
+}
+const laschenTeile = laschenGeometrie();
+const nietGeo = new THREE.CylinderGeometry(1.7, 1.9, 1.0, 40);
+
+/* ------------------------------------------------------------------
+   MATERIALIEN. Bei Metall gilt: „metalness 1" heißt, die Farbe ist nur noch
+   die Tönung der Spiegelung. Die Rauheit (roughness) entscheidet, ob es
+   poliert (klein) oder satiniert (größer) wirkt.
+   Nach Vorlage: Deckelfläche satiniert-glatt (kein Bürsten), Ränder und
+   Lasche heller und glänzender, Etikett schwarz mit feiner Längsmaserung.
+   ------------------------------------------------------------------ */
+const satiniert = new THREE.MeshPhysicalMaterial({
+  color: 0xc4a06a, metalness: 1, roughness: 0.3
+});
+const poliert = new THREE.MeshPhysicalMaterial({
+  color: 0xd6b57a, metalness: 1, roughness: 0.14
+});
+
+/* Feine Längsmaserung fürs Etikett, im Code erzeugt: ein Bild, dessen Spalten
+   leicht unterschiedlich grau sind → senkrechte Streifen. */
+function maserungTextur() {
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 4;
+  const g = c.getContext('2d');
+  for (let x = 0; x < c.width; x++) {
+    const w = 215 + Math.random() * 40;
+    g.fillStyle = `rgb(${w},${w},${w})`;
+    g.fillRect(x, 0, 1, c.height);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+const etikett = new THREE.MeshPhysicalMaterial({
+  color: 0x3a3a3a, metalness: 0.3, roughness: 0.5,
+  roughnessMap: maserungTextur(), anisotropy: 0.35
+});
+
+/* ---- Teile zusammenbauen ---- */
+function metallTeil() {
+  const teil = new THREE.Group();
+  teil.add(new THREE.Mesh(flaecheGeo, satiniert), new THREE.Mesh(randGeo, poliert));
+  return teil;
+}
+const dose = new THREE.Group();
+const deckel = metallTeil();
+const boden = metallTeil();
+const koerper = new THREE.Mesh(koerperGeo, etikett);
+
+/* Lasche: gehört zum Deckel. Sie liegt auf der flachen Deckelmitte
+   (Höhe H-2.4), der Ring ist leicht angehoben. Position/Winkel nach Vorlage. */
+const lasche = new THREE.Group();
+laschenTeile.forEach(g => lasche.add(new THREE.Mesh(g, poliert)));
+const niet = new THREE.Mesh(nietGeo, satiniert);
+niet.rotation.x = 0;                                 // steht senkrecht
+niet.position.set(2.2, 0, 0.9);
+// Extrusion geht in +z; wir legen die Lasche flach auf den Deckel (Drehung um x)
+const laschenWurzel = new THREE.Group();
+lasche.add(niet);
+niet.rotation.x = Math.PI / 2;
+lasche.rotation.x = -Math.PI / 2;                    // flach hinlegen
+laschenWurzel.add(lasche);
+laschenWurzel.position.set(-28, H - 2.4 + 0.4, -3.5);
+laschenWurzel.rotation.y = 0.2;                      // leicht schräg, wie im Bild
+laschenWurzel.rotation.z = 0.13;                     // Ring etwas angehoben, wie im Bild
+deckel.add(laschenWurzel);
+
+deckel.position.y = -H / 2;
+boden.position.y = H / 2;
+boden.scale.y = -1;
+dose.add(deckel, boden, koerper);
+
+/* ---- Bühne, Kamera, Licht ---- */
+const leinwand = document.getElementById('welt');
+const renderer = new THREE.WebGLRenderer({ canvas: leinwand, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+const szene = new THREE.Scene();
+szene.background = new THREE.Color(0x0a0a0a);
+szene.add(dose);
+
+/* ------------------------------------------------------------------
+   STUDIO-LICHT. Metall ist nur so gut wie das, was es spiegelt. Darum bauen wir
+   ein winziges Fotostudio in einer eigenen Szene und „backen" es zu einer
+   Spiegel-Vorlage (PMREM = vorberechnete, unterschiedlich unscharfe Kopien des
+   Studios: scharfe für Politur, verwischte für Satin). Diese Vorlage hängen wir
+   als scene.environment an die Hauptszene.
+   Zutaten wie beim Fotografen (Anleitung, Schritt 5):
+     - dunkler Raum
+     - eine große Softbox schräg von oben (Hauptlicht, „off-axis")
+     - zwei schmale Lichtstreifen (Strips), die helle Kantenlinien auf den
+       Rändern erzeugen
+   Die Lichtflächen sind helle Rechtecke; Helligkeit größer als 1 ist erlaubt.
+   ------------------------------------------------------------------ */
+function studioBauen() {
+  const studio = new THREE.Scene();
+
+  // dunkler Raum: großer Kasten, von innen sichtbar
+  const raum = new THREE.Mesh(
+    new THREE.BoxGeometry(200, 200, 200),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color().setScalar(0.02), side: THREE.BackSide })
+  );
+  studio.add(raum);
+
+  // eine Lichtfläche: Breite, Höhe, Helligkeit, Position; schaut zur Mitte
+  function panel(b, h, helligkeit, pos) {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(b, h),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color().setScalar(helligkeit), side: THREE.DoubleSide })
+    );
+    m.position.set(...pos);
+    m.lookAt(0, 0, 0);
+    studio.add(m);
+  }
+  // Der Deckel ist ein Spiegel nach oben-hinten: Damit er hell wird, muss das
+  // Hauptlicht dort stehen, wo er hinspiegelt (oben, leicht hinter der Dose).
+  panel(34, 22, 3.4, [-12, 26, -20]);  // Hauptlicht: große Softbox, schräg von oben hinten links
+  panel(40, 14, 1.4, [4, 4, 30]);      // schwaches Fülllicht von vorn: lässt das Etikett nicht absaufen
+  panel(2.4, 34, 7, [30, 4, 12]);      // Streifenlicht rechts
+  panel(2.4, 34, 5, [-32, 2, -14]);    // Streifenlicht hinten links (Kantenlinie)
+  return studio;
+}
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+szene.environment = pmrem.fromScene(studioBauen(), 0.02).texture;
+pmrem.dispose();
+
+/* Direkte Lichter brauchen wir nicht mehr: Das Studio liefert alles. */
+const kamera = new THREE.PerspectiveCamera(30, 1, 1, 2000);
+
+/* Kamera nach GRÖSSE statt nach Abstand: „Zeige 110 mm auf dem Bildschirm." */
+const ZEIGE_MM = 110;
+function anpassen() {
+  const b = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(b, h, false);
+  kamera.aspect = b / h;
+  const halbeHoehe = Math.tan(THREE.MathUtils.degToRad(kamera.fov / 2));
+  const abstandHoehe = (ZEIGE_MM / 2) / halbeHoehe;
+  const abstandBreite = (ZEIGE_MM / 2) / (halbeHoehe * kamera.aspect);
+  kamera.position.set(0, 0, Math.max(abstandHoehe, abstandBreite));
+  kamera.updateProjectionMatrix();
+}
+window.addEventListener('resize', anpassen);
+anpassen();
+
+/* Drehen per Ziehen, weich nachlaufend. Startblick ähnlich dem Vorlagenbild
+   (flacher Blick von schräg vorn auf den Deckel). */
+let zielX = 0.3, zielY = 0;
+let cursorX = 0, cursorY = 0;      // Mausposition, -1 bis +1
+let studioX = 0, studioY = 0;      // weich nachlaufende Studio-Drehung
+let ziehen = false, letzteX = 0, letzteY = 0;
+dose.rotation.set(zielX, zielY, 0);
+
+leinwand.addEventListener('pointerdown', e => {
+  ziehen = true; letzteX = e.clientX; letzteY = e.clientY;
+  leinwand.setPointerCapture(e.pointerId);
+});
+leinwand.addEventListener('pointerup', () => ziehen = false);
+leinwand.addEventListener('pointermove', e => {
+  cursorX = (e.clientX / window.innerWidth) * 2 - 1;
+  cursorY = (e.clientY / window.innerHeight) * 2 - 1;
+  if (!ziehen) return;
+  zielY += (e.clientX - letzteX) * 0.01;
+  zielX += (e.clientY - letzteY) * 0.01;
+  letzteX = e.clientX; letzteY = e.clientY;
+});
+
+function schleife() {
+  dose.rotation.x += (zielX - dose.rotation.x) * 0.1;
+  dose.rotation.y += (zielY - dose.rotation.y) * 0.1;
+  /* Das Studio dreht sich mit dem Cursor: Das Metall lebt, weil sich die
+     Spiegelungen verschieben. Der Streifen läuft über Rand und Lasche. */
+  studioX += (cursorX - studioX) * 0.06;
+  studioY += (cursorY - studioY) * 0.06;
+  szene.environmentRotation.set(studioY * 0.45, -studioX * 0.8, 0);
+  renderer.render(szene, kamera);
+  requestAnimationFrame(schleife);
+}
+schleife();
+</script>
+</body>
+</html>
