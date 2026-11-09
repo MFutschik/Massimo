@@ -82,3 +82,23 @@ hier nicht, nur wo sie liegen. **Maßgeblich ist immer die Übergabedatei auf de
 1. Auf dem Server neuen Chat starten, "Mach weiter." schreiben; er liest `UEBERGABE-MOUTH-SERVER.md` und das Arbeitsbrett.
 2. Zuerst prüfen: `~/bin/browser-auftrag liste`, Aufgabenliste, Dienste, `free -m`, ob die Bilderadresse noch läuft.
 3. Einträge der Übergabedatei vom 28.10.–08.11. sind in den lesbaren Verläufen nicht sichtbar – dort nachsehen und nachtragen.
+
+## 7. Auftrag für den neuen Server-Chat: Ausfallsicherheit
+Beschlossen von Jan am 09.11.2026. Vor jedem Bau: Nutzen kurz erklären, Arbeitsbrett-Eintrag, keine Passwörter im Chat.
+Prüfabstand überall: **einmal pro Stunde** (nicht alle 5 Minuten).
+
+1. **Langes Zugangs-Token** für Claude Code auf dem Server (Vorschlag: `claude setup-token`; vorher gegen die aktuelle
+   Anleitung prüfen). Das Ablaufdatum wird gespeichert. **Mindestens 7 Tage vorher** meldet der Chat per Slack und iPhone-Push
+   an Jan/Massimo, dass das Token erneuert werden muss, und fragt nach. Er erneuert es nicht allein, weil dafür eine
+   Anmeldung durch einen Menschen nötig ist.
+2. **Wächter auf dem Server** (systemd-Timer, stündlich, unabhängig von Claude): prüft Claude-Anmeldung, Auftrags-Worker,
+   Fernsteuerung, Speicher, Plattenplatz, Zahl offener Dateien der Dienste. Meldet direkt über die Slack-Schnittstelle
+   **und** per iPhone-Push. Testmeldung beim Einrichten, danach jeden Monat eine "alles ok"-Meldung.
+3. **Prüfung von außen** (externer Dienst, stündlich) ruft `https://mauspropaganda.com/konfigurator/` ab und schlägt per
+   Slack/Mail Alarm, wenn der Server nicht antwortet.
+4. **Automatisches Neustarten** hängender Dienste (nur Dienste, nicht den Server), jeder Eingriff mit Protokoll und Meldung;
+   nach drei Versuchen in Folge nicht weiter neu starten, sondern melden.
+5. **Übergabedatei laufend pflegen**: nach jeder erledigten Aufgabe ein Eintrag mit Datum, nicht erst am Chat-Ende.
+
+Zuerst klären: Warum kam am 08.11. keine Slack-Meldung? Wer sollte sie senden und über welchen Weg? (Bisher unbekannt.)
+Außerdem: Läuft der Auftrags-Worker (`claude_auftrag_worker.py`) noch mit gültiger Anmeldung? Testauftrag anlegen.
