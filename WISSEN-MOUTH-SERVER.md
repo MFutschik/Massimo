@@ -104,7 +104,7 @@ Zuerst klären: Warum kam am 08.11. keine Slack-Meldung? Wer sollte sie senden u
 Außerdem: Läuft der Auftrags-Worker (`claude_auftrag_worker.py`) noch mit gültiger Anmeldung? Testauftrag anlegen.
 
 6. **Sicherheitsprüfung und Härtung** (Jan am 09.11.2026: "alles testen was möglich ist und mehr Sicherheit einbauen").
-   Nur am eigenen Server, nichts davon gegen fremde Systeme. Erst prüfen und Bericht schreiben, dann Änderungen einzeln mit Janes/Massimos Ja,
+   Nur am eigenen Server, nichts davon gegen fremde Systeme. Erst prüfen und Bericht schreiben, dann Änderungen einzeln mit Jans oder Massimos Ja,
    jeweils mit Rückweg (Sicherung der alten Einstellung).
    **Prüfen:**
    - Offene Ports von außen und innen (`ss -tlnp`, Abgleich mit ufw); nur 22, 80, 443, 993 sollen erreichbar sein.
