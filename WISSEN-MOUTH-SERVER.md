@@ -128,3 +128,16 @@ Außerdem: Läuft der Auftrags-Worker (`claude_auftrag_worker.py`) noch mit gül
    - Tägliche Sicherung mit Kopie außerhalb des Servers und monatlichem Rücksicherungstest.
    - Wächter (Punkt 2) um Sicherheitsmeldungen erweitern: ungewöhnlich viele Fehlanmeldungen, neue SSH-Schlüssel, neue Dienste, offene Ports.
    - Bericht der Prüfung in `/srv/mouth/wissen/` ablegen, offene Punkte ins Arbeitsbrett.
+
+## 8. Nachtrag 11.11.2026: Spam-Filter (Auftrag Massimo)
+Eintrag in `/srv/mouth/wissen/` auf dem Server steht noch aus (aus der Cloud-Sitzung nicht schreibbar) – bitte dort nachtragen.
+- **Problem:** KI-Prüfung liefert bei allen "unsicher"-Mails "KI-Fehler (RuntimeError)". Auftrag 20261111-163558-3c82e1 scheiterte mit
+  "OAuth session expired". **Ursache nicht bestätigt** (Log und Code nicht gelesen); Vermutung: abgelaufene Claude-Anmeldung auf dem Server.
+  Behebung: dort `claude` starten, `/login`, im Browser bestätigen; danach unsichere Mails neu prüfen und mind. 10 Testmails ohne Fehler.
+- **Neue Regeln (Betreff, 11.11.):** "Visitor List", "Visitor Directory", "Attendee Categories", "Target Audience",
+  "Acquisition Opportunity", "International Procurement". Bewusst NICHT gesperrt: "Attendee" und "BOE International" allein
+  (würden echte Mails des Messeveranstalters treffen, z. B. boe@messe-dortmund.de, von Massimo als "echt" markiert).
+- **Gesperrt (über "Das ist Spam", Mails verschoben, nichts gelöscht):** Absender barbara.alamoexpodata@gmail.com, lily.grace.intelvia@gmail.com;
+  Domains metrixprolead.live, kaffeeexpress-catering.de, cranerunpeholdings.com, pexoriaplc.shop, lontrend.com, apparelglobalworks.shop,
+  stellen-partner.net, axtralabs.org, ubereats.com (**ganze Domain**, weiter als gewünscht – nur merchants@ gemeint; Regel in der Spamfilter-Seite prüfen).
+- **Im Posteingang gelassen:** noreply@mc.flyeralarm.com, hello@email.xtool.com, hmw@news.hafenmuehle.de, a.flug@xonox-tec.com, reinerbolmer@gmail.com.
